@@ -9,46 +9,24 @@ namespace GameOfLife
         public static void Run(
             IEnumerable<Cell> grid,
             int iterations,
-            Func<IEnumerable<Cell>, IEnumerable<Cell>> iterator,
+            Func<bool, int, bool> applyConditions,
             Action<IEnumerable<Cell>, int> print,
-            Action postIteration)
+            Action postIteration = null)
         {
             for (int iteration = 1; iteration <= iterations; iteration++)
             {
-                grid = iterator(grid);
+                grid = Iterate(grid, applyConditions);
                 print(grid, iteration);
-                postIteration();
+                postIteration?.Invoke();
             }
         }
 
-        public static IEnumerable<Cell> Iterate(IEnumerable<Cell> grid, Func<bool, List<Cell>, bool> applyConditions)
+        private static IEnumerable<Cell> Iterate(IEnumerable<Cell> grid, Func<bool, int, bool> applyConditions)
         {
             // NOTE - need to call ToList to ensure it is fully evaluated.
-            return grid.Select(cell => new Cell(cell.X, cell.Y, applyConditions(cell.SwitchedOn, grid.Neighbours(cell)))).ToList();
+            return grid.Select(cell => new Cell(cell.X, cell.Y, applyConditions(cell.SwitchedOn, grid.Neighbours(cell).Count))).ToList();
         }
-
-        public static bool ApplyConditions(bool cellState, List<Cell> neighbours)
-        {
-            return cellState ?
-                    !CheckUnderpopulation(neighbours) && !CheckOvercrowding(neighbours) :
-                    CheckProcreation(neighbours);
-        }
-
-        public static bool CheckProcreation(List<Cell> neighbours)
-        {
-            return neighbours.Count == 3;
-        }
-
-        public static bool CheckOvercrowding(List<Cell> neighbours)
-        {
-            return neighbours.Count > 3;
-        }
-
-        public static bool CheckUnderpopulation(List<Cell> neighbours)
-        {
-            return neighbours.Count < 2;
-        }
-
+        
         public static List<Cell> Neighbours(this IEnumerable<Cell> grid, Cell cell)
         {
             return grid.Where(otherCell => cell.IsNextTo(otherCell) && otherCell.SwitchedOn).ToList();
@@ -91,6 +69,19 @@ namespace GameOfLife
                     yield return new Cell(i, j, grid[i, j]);
                 }
             }
+        }
+
+        public static Func<bool, int, bool> ApplyConditionsFactory(List<int> born, List<int> stayAlive)
+        {
+            return (cellState, neighbourCount) =>
+            {
+                return cellState ? stayAlive.Contains(neighbourCount) : born.Contains(neighbourCount);
+            };
+        }
+
+        public static Func<bool, int, bool> DefaultApplyConditions()
+        {
+            return ApplyConditionsFactory(new List<int> { 3 }, new List<int> { 2, 3 });
         }
     }
 }

@@ -31,37 +31,47 @@ namespace GameOfLife.Tests
         }
 
         [Test]
-        public void Run_With3Iterations_AllIterationsRun()
-        {
-            var grid = GameOfLife.GetGrid(new bool[1, 1]);
-            int iterations = 3;
-            int actualIterations = 0;
-
-            Func<IEnumerable<Cell>, IEnumerable<Cell>> iterator = iterat =>
-            {
-                actualIterations++;
-                return new List<Cell> { new Cell(1, 1, false) };
-            };
-
-            GameOfLife.Run(grid, iterations, iterator, (bools, i) => { }, () => { });
-
-            Assert.That(actualIterations, Is.EqualTo(iterations));
-        }
-
-        [Test]
         public void Run_IteratedGridResult_IterationResultPassedToPrint()
         {
             var grid = GameOfLife.GetGrid(new bool[2, 2]);
             var iteratedGrid = GameOfLife.GetGrid(new bool[2, 2]);
+            int iterations = 6;
+            int actualIterations = 0;
             IEnumerable<Cell> actualGrid = null;
+            
+            Func<bool, int, bool> apply = (state, neighbours) => { return false; };
+            Action<IEnumerable<Cell>, int> print = (gridToPrint, iteration) => { actualGrid = gridToPrint; actualIterations++; };
+            
+            GameOfLife.Run(grid, iterations, apply, print);
 
-            Func<IEnumerable<Cell>, IEnumerable<Cell>> iterator = iterat => iteratedGrid;
-            Action<IEnumerable<Cell>, int> print = (gridToPrint, iteration) => { actualGrid = gridToPrint; };
-
-            GameOfLife.Run(grid, 1, iterator, print, () => { });
-
+            Assert.That(actualIterations, Is.EqualTo(iterations));
+            Assert.That(actualGrid, Is.EqualTo(iteratedGrid));
             Assert.That(actualGrid, Is.Not.SameAs(grid));
-            Assert.That(actualGrid, Is.SameAs(iteratedGrid));
+        }
+
+        [Test, TestCaseSource(nameof(ApplyConditionsTest))]
+        public void Run_ApplyConditionsCalledForEachCellAndIteration(IEnumerable<Cell> grid)
+        {
+            int numberOfCellsInGrid = grid.Count();
+            int iterations = 3;
+            int expectedApplications = iterations * numberOfCellsInGrid;
+            int applyConditionsCalledTimes = 0;
+
+            Func<bool, int, bool> apply = (state, neighbours) => {
+                applyConditionsCalledTimes++;
+                return false;
+            };
+
+            GameOfLife.Run(grid, iterations, apply, (bools, i) => { });
+
+            Assert.That(applyConditionsCalledTimes, Is.EqualTo(expectedApplications));
+        }
+
+        private static IEnumerable<TestCaseData> ApplyConditionsTest()
+        {
+            yield return new TestCaseData(GameOfLife.GetGrid(new bool[1, 1])).SetName("ApplyConditionsTest_1By1Grid");
+            yield return new TestCaseData(GameOfLife.GetGrid(new bool[2, 2])).SetName("ApplyConditionsTest_2By2Grid");
+            yield return new TestCaseData(GameOfLife.GetGrid(new bool[3, 4])).SetName("ApplyConditionsTest_3By4Grid");
         }
 
         [Test]
@@ -85,83 +95,7 @@ namespace GameOfLife.Tests
 
             Assert.That(neighbours.Count, Is.EqualTo(3));
         }
-
-        [Test, TestCaseSource(nameof(CheckProcreationTests))]
-        public void CheckProcreationTest(List<Cell> neighbours, bool expected)
-        {
-            bool result = GameOfLife.CheckProcreation(neighbours);
-
-            Assert.That(result, Is.EqualTo(expected));
-        }
-
-        private static IEnumerable<TestCaseData> CheckProcreationTests()
-        {
-            yield return new TestCaseData(GetRandomNeighbours(3), true).SetName("CheckProcreation_With3Neighbours_ReturnsTrue");
-            yield return new TestCaseData(GetRandomNeighbours(4), false).SetName("CheckProcreation_With4Neighbours_ReturnsFalse");
-            yield return new TestCaseData(GetRandomNeighbours(2), false).SetName("CheckProcreation_With2Neighbours_ReturnsFalse");
-        }
-
-        [Test, TestCaseSource(nameof(CheckOvercrowdingTests))]
-        public void CheckOvercrowdingTest(List<Cell> neighbours, bool expected)
-        {
-            bool result = GameOfLife.CheckOvercrowding(neighbours);
-
-            Assert.That(result, Is.EqualTo(expected));
-        }
-
-        private static IEnumerable<TestCaseData> CheckOvercrowdingTests()
-        {
-            yield return new TestCaseData(GetRandomNeighbours(3), false).SetName("CheckOvercrowding_With3Neighbours_ReturnsFalse");
-            yield return new TestCaseData(GetRandomNeighbours(2), false).SetName("CheckOvercrowding_With2Neighbours_ReturnsFalse");
-            yield return new TestCaseData(GetRandomNeighbours(4), true).SetName("CheckOvercrowding_With4Neighbours_ReturnsTrue");
-        }
-
-        [Test, TestCaseSource(nameof(CheckUnderpopulationTests))]
-        public void CheckUnderpopulationTest(List<Cell> neighbours, bool expected)
-        {
-            bool result = GameOfLife.CheckUnderpopulation(neighbours);
-
-            Assert.That(result, Is.EqualTo(expected));
-        }
-
-        private static IEnumerable<TestCaseData> CheckUnderpopulationTests()
-        {
-            yield return new TestCaseData(GetRandomNeighbours(3), false).SetName("CheckUnderpopulation_With3Neighbours_ReturnsFalse");
-            yield return new TestCaseData(GetRandomNeighbours(2), false).SetName("CheckUnderpopulation_With2Neighbours_ReturnsFalse");
-            yield return new TestCaseData(GetRandomNeighbours(1), true).SetName("CheckUnderpopulation_With1Neighbour_ReturnsTrue");
-        }
-
-        private static IEnumerable<Cell> GetRandomNeighbours(int numberOfNeighbours)
-        {
-            var neighbours = new List<Cell>();
-
-            for (int i = 0; i < numberOfNeighbours; i++)
-            {
-                neighbours.Add(new Cell(0, 0, true));
-            }
-
-            return neighbours;
-        }
-
-        [Test]
-        public void Iterate_WithTwoSquareGrid_ApplyConditionsCalledForEachCell()
-        {
-            IEnumerable<Cell> grid = GameOfLife.GetGrid(new bool[2, 2]);
-            int applyConditionsCalledTimes = 0;
-
-
-            Func<bool, IEnumerable<Cell>, bool> applyConditions = (cellState, neighbours) =>
-            {
-                applyConditionsCalledTimes++;
-                return true;
-            };
-
-            IEnumerable<Cell> result = GameOfLife.Iterate(grid, applyConditions);
-
-            Assert.That(result, Is.Not.SameAs(grid));
-            Assert.That(applyConditionsCalledTimes, Is.EqualTo(4));
-        }
-
+        
         [Test]
         public void Print_WithPopulatedGrid_OutputIsFormatted()
         {
@@ -177,7 +111,45 @@ namespace GameOfLife.Tests
             Assert.That(outputLines[0], Is.EqualTo("Iteration 1"));
             Assert.That(outputLines[1], Is.EqualTo("x."));
             Assert.That(outputLines[2], Is.EqualTo(".x"));
-
         }
+
+        [Test, TestCaseSource(nameof(ApplyConditionsFactoryTestsAllDie))]
+        public void ApplyConditionsFactory_BehavesAsSpecifiedWhenAllDieCondition(int neighbours, bool startState, bool expectedState)
+        {
+            var applyFunction = GameOfLife.ApplyConditionsFactory(new List<int>(), new List<int>());
+            var actualState = applyFunction(startState, neighbours);
+            Assert.That(actualState, Is.EqualTo(expectedState));
+        }
+
+        private static IEnumerable<TestCaseData> ApplyConditionsFactoryTestsAllDie()
+        {
+            for (int neighbours = 0; neighbours <= 8; neighbours++)
+            {
+                yield return new TestCaseData(neighbours, false, false).SetName($"ApplyConditionsFactoryTests_AllDie_StaysDead_{neighbours}");
+                yield return new TestCaseData(neighbours, true, false).SetName($"ApplyConditionsFactoryTests_AllDie_Dies_{neighbours}");
+            }
+        }
+
+        [Test, TestCaseSource(nameof(ApplyConditionsFactoryTestsStandard))]
+        public void ApplyConditionsFactory_BehavesAsSpecifiedWithStandardRules(int neighbours, bool startState, bool expectedState)
+        {
+            var applyFunction = GameOfLife.ApplyConditionsFactory(new List<int> { 3 }, new List<int> { 2, 3 });
+            var actualState = applyFunction(startState, neighbours);
+            Assert.That(actualState, Is.EqualTo(expectedState));
+        }
+
+        private static IEnumerable<TestCaseData> ApplyConditionsFactoryTestsStandard()
+        {
+            yield return new TestCaseData(1, false, false).SetName($"ApplyConditionsFactoryTestsStandard_Born_1");
+            yield return new TestCaseData(2, false, false).SetName($"ApplyConditionsFactoryTestsStandard_Born_2");
+            yield return new TestCaseData(3, false, true).SetName($"ApplyConditionsFactoryTestsStandard_Born_3");
+            yield return new TestCaseData(4, false, false).SetName($"ApplyConditionsFactoryTestsStandard_Born_4");
+
+            yield return new TestCaseData(1, true, false).SetName($"ApplyConditionsFactoryTestsStandard_Stay_1");
+            yield return new TestCaseData(2, true, true).SetName($"ApplyConditionsFactoryTestsStandard_Stay_2");
+            yield return new TestCaseData(3, true, true).SetName($"ApplyConditionsFactoryTestsStandard_Stay_3");
+            yield return new TestCaseData(4, true, false).SetName($"ApplyConditionsFactoryTestsStandard_Stay_4");
+        }
+
     }
 }
