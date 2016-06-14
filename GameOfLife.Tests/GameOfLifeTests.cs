@@ -46,7 +46,7 @@ namespace GameOfLife.Tests
 
             Assert.That(actualIterations, Is.EqualTo(iterations));
             Assert.That(actualGrid, Is.EqualTo(iteratedGrid));
-            Assert.That(actualGrid, Is.Not.SameAs(grid));
+            Assert.That(actualGrid, Is.Not.SameAs(grid)); 
         }
 
         [Test, TestCaseSource(nameof(ApplyConditionsTest))]
